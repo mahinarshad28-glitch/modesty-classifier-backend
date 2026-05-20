@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Modesty Classifier</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --bg2: #111118;
+    --bg3: #16161f;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.13);
+    --text: #f0eff6;
+    --muted: rgba(240,239,246,0.45);
+    --accent: #7c6af7;
+    --accent2: #a78bfa;
+    --teal: #2dd4bf;
+    --rose: #fb7185;
+    --amber: #fbbf24;
+    --green: #4ade80;
+    --card-r: 16px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* BG grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(124,106,247,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(124,106,247,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Glow blobs */
+  .blob1, .blob2 {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(100px);
+    pointer-events: none;
+    z-index: 0;
+  }
+  .blob1 { width: 500px; height: 500px; background: rgba(124,106,247,0.12); top: -150px; left: -100px; }
+  .blob2 { width: 400px; height: 400px; background: rgba(45,212,191,0.07); bottom: -100px; right: -100px; }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  /* HEADER */
+  header {
+    padding: 28px 0 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 48px;
+  }
+  .header-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .logo-icon {
+    width: 38px; height: 38px;
+    background: linear-gradient(135deg, var(--accent), var(--teal));
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .logo-text {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 20px;
+    letter-spacing: -0.3px;
+  }
+  .logo-text span { color: var(--accent2); }
+  .badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    padding: 5px 12px;
+    border-radius: 20px;
+    background: rgba(124,106,247,0.12);
+    border: 1px solid rgba(124,106,247,0.25);
+    color: var(--accent2);
+    letter-spacing: 0.5px;
+  }
+
+  /* HERO */
+  .hero {
+    text-align: center;
+    margin-bottom: 52px;
+  }
+  .hero-eyebrow {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--teal);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+  .hero h1 {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: clamp(32px, 5vw, 54px);
+    line-height: 1.1;
+    letter-spacing: -1.5px;
+    margin-bottom: 18px;
+  }
+  .hero h1 .grad {
+    background: linear-gradient(90deg, var(--accent2), var(--teal));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .hero p {
+    font-size: 17px;
+    color: var(--muted);
+    max-width: 520px;
+    margin: 0 auto;
+    line-height: 1.7;
+  }
+
+  /* STATS ROW */
+  .stats-row {
+    display: flex;
+    justify-content: center;
+    gap: 32px;
+    margin-bottom: 52px;
+    flex-wrap: wrap;
+  }
+  .stat {
+    text-align: center;
+  }
+  .stat-num {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 26px;
+    color: var(--accent2);
+  }
+  .stat-label {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  /* MAIN GRID */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 28px;
+  }
+  @media (max-width: 760px) {
+    .main-grid { grid-template-columns: 1fr; }
+  }
+
+  /* CARDS */
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--card-r);
+    padding: 28px;
+    transition: border-color 0.2s;
+  }
+  .card:hover { border-color: var(--border2); }
+  .card-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card-title-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+
+  /* UPLOAD AREA */
+  .upload-zone {
+    border: 2px dashed rgba(124,106,247,0.3);
+    border-radius: 12px;
+    padding: 40px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    background: rgba(124,106,247,0.02);
+  }
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(124,106,247,0.06);
+  }
+  .upload-zone input { display: none; }
+  .upload-icon {
+    font-size: 42px;
+    margin-bottom: 12px;
+    opacity: 0.6;
+  }
+  .upload-main-text {
+    font-family: 'Syne', sans-serif;
+    font-weight: 600;
+    font-size: 16px;
+    margin-bottom: 6px;
+  }
+  .upload-sub-text {
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .upload-formats {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: rgba(124,106,247,0.6);
+    margin-top: 14px;
+  }
+
+  /* preview image */
+  #preview-container {
+    display: none;
+    margin-top: 16px;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--border2);
+    position: relative;
+  }
+  #preview-img {
+    width: 100%;
+    max-height: 280px;
+    object-fit: contain;
+    background: var(--bg3);
+    display: block;
+  }
+  .preview-remove {
+    position: absolute;
+    top: 8px; right: 8px;
+    background: rgba(0,0,0,0.7);
+    border: none;
+    color: white;
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.2s;
+  }
+  .preview-remove:hover { background: rgba(251,113,133,0.8); }
+
+  /* REGION SELECTOR */
+  .region-select-label {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .region-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  .region-pill {
+    padding: 7px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-family: 'DM Mono', monospace;
+    border: 1px solid var(--border2);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .region-pill:hover { border-color: var(--accent); color: var(--accent2); }
+  .region-pill.active {
+    background: rgba(124,106,247,0.15);
+    border-color: var(--accent);
+    color: var(--accent2);
+  }
+
+  /* ANALYZE BTN */
+  .analyze-btn {
+    width: 100%;
+    padding: 15px;
+    border-radius: 12px;
+    border: none;
+    background: linear-gradient(135deg, var(--accent), #5b52c7);
+    color: white;
+    font-family: 'Syne', sans-serif;
+    font-weight: 600;
+    font-size: 15px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.3px;
+    position: relative;
+    overflow: hidden;
+  }
+  .analyze-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(124,106,247,0.35);
+  }
+  .analyze-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  .analyze-btn .btn-loader {
+    display: none;
+    width: 16px; height: 16px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin: 0 auto;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .analyze-btn.loading .btn-text { display: none; }
+  .analyze-btn.loading .btn-loader { display: block; }
+
+  /* MODEL TOGGLES */
+  .model-toggles {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s;
+  }
+  .toggle-row:hover { border-color: var(--border2); }
+  .toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+  }
+  .toggle-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+  }
+  .dot-det { background: var(--accent); }
+  .dot-cls { background: var(--teal); }
+  .dot-seg { background: var(--rose); }
+  .toggle-switch {
+    width: 36px; height: 20px;
+    background: var(--border2);
+    border-radius: 10px;
+    cursor: pointer;
+    position: relative;
+    transition: background 0.2s;
+    border: none;
+    flex-shrink: 0;
+  }
+  .toggle-switch.on { background: var(--accent); }
+  .toggle-switch::after {
+    content: '';
+    position: absolute;
+    top: 3px; left: 3px;
+    width: 14px; height: 14px;
+    background: white;
+    border-radius: 50%;
+    transition: transform 0.2s;
+  }
+  .toggle-switch.on::after { transform: translateX(16px); }
+
+  /* RESULT PANEL */
+  .result-panel { grid-column: 1 / -1; }
+  .result-panel-inner {
+    display: none;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .result-panel-inner.visible { display: flex; }
+
+  /* ANNOTATED IMAGE */
+  .result-image-wrap {
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border2);
+    background: var(--bg3);
+    text-align: center;
+  }
+  #annotated-img {
+    width: 100%;
+    max-height: 420px;
+    object-fit: contain;
+  }
+
+  /* RESULTS TABS */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    background: var(--bg3);
+    border-radius: 10px;
+    width: fit-content;
+  }
+  .tab-btn {
+    padding: 8px 18px;
+    border-radius: 7px;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .tab-btn.active {
+    background: var(--bg2);
+    color: var(--text);
+    border: 1px solid var(--border2);
+  }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* DETECTION TABLE */
+  .det-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .det-table th {
+    text-align: left;
+    padding: 10px 14px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    letter-spacing: 0.5px;
+  }
+  .det-table td {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  .det-table tr:last-child td { border-bottom: none; }
+  .class-badge {
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-family: 'DM Mono', monospace;
+    font-weight: 500;
+  }
+  .class-modest-male     { background: rgba(45,212,191,0.12); color: var(--teal); }
+  .class-immodest-male   { background: rgba(251,113,133,0.12); color: var(--rose); }
+  .class-modest-hijab    { background: rgba(124,106,247,0.12); color: var(--accent2); }
+  .class-modest-niqab    { background: rgba(251,191,36,0.12);  color: var(--amber); }
+  .class-immodest-female { background: rgba(251,113,133,0.15); color: var(--rose); }
+
+  /* CONF BAR */
+  .conf-bar-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .conf-bar-bg {
+    flex: 1;
+    height: 5px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .conf-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--teal));
+  }
+  .conf-val {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    min-width: 38px;
+    text-align: right;
+  }
+
+  /* BEST CLASSIFICATION CARD */
+  .cls-big {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 20px;
+    background: var(--bg3);
+    border-radius: 12px;
+    border: 1px solid var(--border2);
+  }
+  .cls-icon-circle {
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    background: rgba(124,106,247,0.15);
+    border: 2px solid rgba(124,106,247,0.3);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px;
+    flex-shrink: 0;
+  }
+  .cls-name {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 20px;
+    margin-bottom: 4px;
+  }
+  .cls-meta { font-size: 13px; color: var(--muted); }
+  .cls-conf {
+    margin-left: auto;
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 28px;
+    color: var(--teal);
+  }
+
+  /* PER MODEL SUMMARY */
+  .model-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  @media (max-width: 600px) { .model-summary-grid { grid-template-columns: 1fr; } }
+  .model-card {
+    background: var(--bg3);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    padding: 16px;
+  }
+  .model-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .model-avatar {
+    width: 30px; height: 30px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, var(--accent), var(--teal));
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+  }
+  .model-name { font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600; }
+  .model-regions { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .model-stat-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--muted);
+    padding: 4px 0;
+  }
+  .model-stat-row span:last-child { color: var(--text); font-family: 'DM Mono', monospace; }
+
+  /* EMPTY STATE */
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+  }
+  .empty-state-icon { font-size: 48px; opacity: 0.3; margin-bottom: 16px; }
+  .empty-state-text { font-size: 15px; }
+
+  /* ERROR */
+  .error-banner {
+    display: none;
+    padding: 14px 18px;
+    background: rgba(251,113,133,0.1);
+    border: 1px solid rgba(251,113,133,0.25);
+    border-radius: 10px;
+    font-size: 13px;
+    color: var(--rose);
+    margin-top: 12px;
+  }
+  .error-banner.visible { display: block; }
+
+  /* API URL INPUT */
+  .api-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 16px;
+  }
+  .api-input-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .api-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--teal);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+  }
+
+  /* FOOTER */
+  footer {
+    text-align: center;
+    padding: 40px 0;
+    margin-top: 60px;
+    border-top: 1px solid var(--border);
+    font-size: 13px;
+    color: var(--muted);
+  }
+  footer span { color: var(--accent2); }
+</style>
+</head>
+<body>
+
+<div class="blob1"></div>
+<div class="blob2"></div>
+
+<div class="container">
+
+  <header>
+    <div class="header-inner">
+      <div class="logo">
+        <div class="logo-icon">🔍</div>
+        <div class="logo-text">Modesty<span>AI</span></div>
+      </div>
+      <div class="badge">v1.0 · 9 Models · 6 Regions</div>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="hero-eyebrow">AI-Powered Analysis</div>
+    <h1>Modesty <span class="grad">Classification</span><br>Detection & Segmentation</h1>
+    <p>Upload an image to classify, detect, and segment using 9 trained YOLO models across 6 geographic regions.</p>
+  </section>
+
+  <div class="stats-row">
+    <div class="stat"><div class="stat-num">9</div><div class="stat-label">YOLO Models</div></div>
+    <div class="stat"><div class="stat-num">6</div><div class="stat-label">Regions</div></div>
+    <div class="stat"><div class="stat-num">5</div><div class="stat-label">Classes</div></div>
+    <div class="stat"><div class="stat-num">3</div><div class="stat-label">Tasks</div></div>
+  </div>
+
+  <div class="main-grid">
+
+    <!-- LEFT: UPLOAD -->
+    <div class="card">
+      <div class="card-title"><div class="card-title-dot"></div>Upload Image</div>
+
+      <div class="api-input-wrap">
+        <span class="api-input-label">API URL</span>
+        <input class="api-input" id="api-url" type="text" value="http://localhost:8000/analyze" placeholder="http://localhost:8000/analyze" />
+      </div>
+
+      <div class="upload-zone" id="upload-zone">
+        <input type="file" id="file-input" accept="image/*">
+        <div class="upload-icon">📁</div>
+        <div class="upload-main-text">Drop image here</div>
+        <div class="upload-sub-text">or click to browse files</div>
+        <div class="upload-formats">JPG · PNG · WEBP · BMP</div>
+      </div>
+
+      <div id="preview-container">
+        <img id="preview-img" src="" alt="Preview">
+        <button class="preview-remove" id="remove-btn" title="Remove">✕</button>
+      </div>
+
+      <div class="error-banner" id="error-banner"></div>
+
+      <div style="margin-top: 16px;">
+        <button class="analyze-btn" id="analyze-btn" disabled>
+          <span class="btn-text">🔍 &nbsp;Analyze Image</span>
+          <div class="btn-loader"></div>
+        </button>
+      </div>
+    </div>
+
+    <!-- RIGHT: CONFIG -->
+    <div class="card">
+      <div class="card-title"><div class="card-title-dot" style="background:var(--teal)"></div>Model Configuration</div>
+
+      <div class="region-select-label">Filter by Region (optional)</div>
+      <div class="region-pills" id="region-pills">
+        <button class="region-pill active" data-region="all">All Regions</button>
+        <button class="region-pill" data-region="region1">Region 1</button>
+        <button class="region-pill" data-region="region2">Region 2</button>
+        <button class="region-pill" data-region="region3">Region 3</button>
+        <button class="region-pill" data-region="region4">Region 4</button>
+        <button class="region-pill" data-region="region5">Region 5</button>
+        <button class="region-pill" data-region="region6">Region 6</button>
+      </div>
+
+      <div class="card-title" style="margin-top:8px"><div class="card-title-dot" style="background:var(--rose)"></div>Analysis Tasks</div>
+      <div class="model-toggles">
+        <div class="toggle-row">
+          <div class="toggle-label">
+            <div class="toggle-dot dot-det"></div>
+            <div>
+              <div style="font-size:13px">Detection</div>
+              <div style="font-size:11px;color:var(--muted)">Bounding boxes around persons</div>
+            </div>
+          </div>
+          <button class="toggle-switch on" id="toggle-det" aria-label="Toggle Detection"></button>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-label">
+            <div class="toggle-dot dot-cls"></div>
+            <div>
+              <div style="font-size:13px">Classification</div>
+              <div style="font-size:11px;color:var(--muted)">Modesty class prediction</div>
+            </div>
+          </div>
+          <button class="toggle-switch on" id="toggle-cls" aria-label="Toggle Classification"></button>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-label">
+            <div class="toggle-dot dot-seg"></div>
+            <div>
+              <div style="font-size:13px">Segmentation</div>
+              <div style="font-size:11px;color:var(--muted)">Pixel-level mask overlay</div>
+            </div>
+          </div>
+          <button class="toggle-switch on" id="toggle-seg" aria-label="Toggle Segmentation"></button>
+        </div>
+      </div>
+
+      <!-- CLASSES LEGEND -->
+      <div class="card-title"><div class="card-title-dot" style="background:var(--amber)"></div>Class Legend</div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;align-items:center;gap:10px;font-size:12px">
+          <span class="class-badge class-modest-male">Modest_Male</span>
+          <span style="color:var(--muted)">Class 0</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;font-size:12px">
+          <span class="class-badge class-immodest-male">Immodest_Male</span>
+          <span style="color:var(--muted)">Class 1</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;font-size:12px">
+          <span class="class-badge class-modest-hijab">Modest_Female_Hijab</span>
+          <span style="color:var(--muted)">Class 2</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;font-size:12px">
+          <span class="class-badge class-modest-niqab">Modest_Female_Niqab</span>
+          <span style="color:var(--muted)">Class 3</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;font-size:12px">
+          <span class="class-badge class-immodest-female">Immodest_Female</span>
+          <span style="color:var(--muted)">Class 4</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- RESULTS (full width) -->
+    <div class="card result-panel">
+      <div class="card-title"><div class="card-title-dot" style="background:var(--green)"></div>Results</div>
+
+      <div id="empty-state" class="empty-state">
+        <div class="empty-state-icon">🖼️</div>
+        <div class="empty-state-text">Upload an image and click Analyze to see results</div>
+      </div>
+
+      <div class="result-panel-inner" id="result-inner">
+
+        <!-- Annotated image -->
+        <div class="result-image-wrap">
+          <img id="annotated-img" src="" alt="Annotated Result">
+        </div>
+
+        <!-- TABS -->
+        <div>
+          <div class="tabs">
+            <button class="tab-btn active" data-tab="detection">Detection</button>
+            <button class="tab-btn" data-tab="classification">Classification</button>
+            <button class="tab-btn" data-tab="segmentation">Segmentation</button>
+            <button class="tab-btn" data-tab="models">Per Model</button>
+          </div>
+
+          <!-- DETECTION TAB -->
+          <div class="tab-content active" id="tab-detection" style="margin-top:16px">
+            <table class="det-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Class</th>
+                  <th>Confidence</th>
+                  <th>Model</th>
+                  <th>BBox</th>
+                </tr>
+              </thead>
+              <tbody id="det-tbody"></tbody>
+            </table>
+          </div>
+
+          <!-- CLASSIFICATION TAB -->
+          <div class="tab-content" id="tab-classification" style="margin-top:16px">
+            <div class="cls-big" id="cls-big">
+              <div class="cls-icon-circle" id="cls-icon">🧕</div>
+              <div>
+                <div class="cls-name" id="cls-name">—</div>
+                <div class="cls-meta" id="cls-meta">—</div>
+              </div>
+              <div class="cls-conf" id="cls-conf">—</div>
+            </div>
+            <div style="margin-top:16px" id="all-cls-list"></div>
+          </div>
+
+          <!-- SEGMENTATION TAB -->
+          <div class="tab-content" id="tab-segmentation" style="margin-top:16px">
+            <div id="seg-info" style="font-size:14px;color:var(--muted);line-height:1.8"></div>
+          </div>
+
+          <!-- PER MODEL TAB -->
+          <div class="tab-content" id="tab-models" style="margin-top:16px">
+            <div class="model-summary-grid" id="model-grid"></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div><!-- end main-grid -->
+
+  <footer>
+    Built with <span>FastAPI</span> + <span>YOLO Ultralytics</span> · 9 Models · 6 Regions · 5 Classes
+  </footer>
+
+</div><!-- end container -->
+
+<script>
+const CLASS_NAMES = [
+  "Modest_Male",
+  "Immodest_Male",
+  "Modest_Female_Hijab",
+  "Modest_Female_Niqab",
+  "Immodest_Female"
+];
+const CLASS_ICONS = ["👨", "👨", "🧕", "🧣", "👩"];
+const CLASS_BADGE_MAP = [
+  "class-modest-male",
+  "class-immodest-male",
+  "class-modest-hijab",
+  "class-modest-niqab",
+  "class-immodest-female"
+];
+
+const PERSON_LABELS = {
+  person1: { name: "P1", regions: "Regions 1–2" },
+  person2: { name: "P2", regions: "Regions 3–4" },
+  person3: { name: "P3", regions: "Regions 5–6" }
+};
+
+let selectedFile = null;
+let selectedRegion = "all";
+
+// Upload zone
+const zone = document.getElementById('upload-zone');
+const fileInput = document.getElementById('file-input');
+const previewContainer = document.getElementById('preview-container');
+const previewImg = document.getElementById('preview-img');
+const removeBtn = document.getElementById('remove-btn');
+const analyzeBtn = document.getElementById('analyze-btn');
+const errorBanner = document.getElementById('error-banner');
+
+zone.addEventListener('click', () => fileInput.click());
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+zone.addEventListener('drop', e => {
+  e.preventDefault();
+  zone.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f && f.type.startsWith('image/')) loadFile(f);
+});
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) loadFile(fileInput.files[0]); });
+
+function loadFile(f) {
+  selectedFile = f;
+  const url = URL.createObjectURL(f);
+  previewImg.src = url;
+  previewContainer.style.display = 'block';
+  zone.style.display = 'none';
+  analyzeBtn.disabled = false;
+  hideError();
+}
+
+removeBtn.addEventListener('click', () => {
+  selectedFile = null;
+  previewContainer.style.display = 'none';
+  zone.style.display = 'block';
+  fileInput.value = '';
+  analyzeBtn.disabled = true;
+  hideError();
+});
+
+// Region pills
+document.querySelectorAll('.region-pill').forEach(p => {
+  p.addEventListener('click', () => {
+    document.querySelectorAll('.region-pill').forEach(x => x.classList.remove('active'));
+    p.classList.add('active');
+    selectedRegion = p.dataset.region;
+  });
+});
+
+// Toggle switches
+document.querySelectorAll('.toggle-switch').forEach(t => {
+  t.addEventListener('click', () => t.classList.toggle('on'));
+});
+
+// Tabs
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+// Analyze
+analyzeBtn.addEventListener('click', async () => {
+  if (!selectedFile) return;
+
+  const apiUrl = document.getElementById('api-url').value.trim() || 'http://localhost:8000/analyze';
+
+  analyzeBtn.classList.add('loading');
+  analyzeBtn.disabled = true;
+  hideError();
+
+  try {
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+    if (selectedRegion !== 'all') formData.append('region', selectedRegion);
+
+    const response = await fetch(apiUrl, { method: 'POST', body: formData });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || `Server error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    renderResults(data);
+  } catch (err) {
+    showError('❌ ' + err.message + ' — Make sure your FastAPI backend is running.');
+  } finally {
+    analyzeBtn.classList.remove('loading');
+    analyzeBtn.disabled = false;
+  }
+});
+
+function renderResults(data) {
+  document.getElementById('empty-state').style.display = 'none';
+  document.getElementById('result-inner').classList.add('visible');
+
+  // Annotated image
+  if (data.annotated_image) {
+    document.getElementById('annotated-img').src = 'data:image/jpeg;base64,' + data.annotated_image;
+  }
+
+  // DETECTION tab
+  const tbody = document.getElementById('det-tbody');
+  tbody.innerHTML = '';
+  const dets = data.all_detections || [];
+  if (dets.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px">No detections found</td></tr>';
+  } else {
+    dets.forEach((d, i) => {
+      const cls = d.class_name || CLASS_NAMES[d.class_id] || 'Unknown';
+      const badgeClass = CLASS_BADGE_MAP[d.class_id] || 'class-modest-male';
+      const conf = (d.confidence * 100).toFixed(1);
+      const bbox = d.bbox ? d.bbox.map(v => Math.round(v)).join(', ') : '—';
+      const personLabel = PERSON_LABELS[d.person] || { name: d.person, regions: '' };
+      tbody.innerHTML += `
+        <tr>
+          <td style="color:var(--muted);font-family:'DM Mono',monospace;font-size:12px">${i+1}</td>
+          <td><span class="class-badge ${badgeClass}">${cls}</span></td>
+          <td>
+            <div class="conf-bar-wrap">
+              <div class="conf-bar-bg"><div class="conf-bar-fill" style="width:${conf}%"></div></div>
+              <span class="conf-val">${conf}%</span>
+            </div>
+          </td>
+          <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${personLabel.name} (${personLabel.regions})</td>
+          <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">[${bbox}]</td>
+        </tr>`;
+    });
+  }
+
+  // CLASSIFICATION tab
+  const bc = data.best_classification;
+  if (bc) {
+    const conf = (bc.confidence * 100).toFixed(1);
+    const clsName = bc.class_name || CLASS_NAMES[bc.class_id] || 'Unknown';
+    const icon = CLASS_ICONS[bc.class_id] || '👤';
+    const personLabel = PERSON_LABELS[bc.person] || { name: bc.person, regions: '' };
+    document.getElementById('cls-icon').textContent = icon;
+    document.getElementById('cls-name').textContent = clsName;
+    document.getElementById('cls-meta').textContent = `Best model: ${personLabel.name} · ${personLabel.regions}`;
+    document.getElementById('cls-conf').textContent = conf + '%';
+  }
+
+  // All classifications list
+  const allClsList = document.getElementById('all-cls-list');
+  allClsList.innerHTML = '<div style="font-size:12px;color:var(--muted);margin-bottom:10px">All model classifications:</div>';
+  const summary = data.per_model_summary || [];
+  summary.forEach(s => {
+    if (s.classification) {
+      const conf = (s.classification.confidence * 100).toFixed(1);
+      const cls = s.classification.class_name || CLASS_NAMES[s.classification.class_id] || 'Unknown';
+      const badgeClass = CLASS_BADGE_MAP[s.classification.class_id] || 'class-modest-male';
+      const pl = PERSON_LABELS[s.person] || { name: s.person, regions: s.regions.join(', ') };
+      allClsList.innerHTML += `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px">
+          <span style="color:var(--muted);font-family:'DM Mono',monospace">${pl.name} (${pl.regions})</span>
+          <span class="class-badge ${badgeClass}">${cls}</span>
+          <span style="color:var(--teal);font-family:'DM Mono',monospace">${conf}%</span>
+        </div>`;
+    }
+  });
+
+  // SEGMENTATION tab
+  const segInfo = document.getElementById('seg-info');
+  const bestSeg = summary.reduce((a, b) => (a.seg_masks_found > b.seg_masks_found ? a : b), summary[0] || {});
+  segInfo.innerHTML = summary.map(s => {
+    const pl = PERSON_LABELS[s.person] || { name: s.person, regions: s.regions ? s.regions.join(', ') : '' };
+    return `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+      <span style="color:var(--muted)">${pl.name} — ${pl.regions}</span>
+      <span style="font-family:'DM Mono',monospace;color:${s.seg_masks_found > 0 ? 'var(--teal)' : 'var(--muted)'}">${s.seg_masks_found} mask${s.seg_masks_found !== 1 ? 's' : ''}</span>
+    </div>`;
+  }).join('');
+
+  // PER MODEL tab
+  const grid = document.getElementById('model-grid');
+  grid.innerHTML = '';
+  summary.forEach(s => {
+    const pl = PERSON_LABELS[s.person] || { name: s.person, regions: s.regions ? s.regions.join(', ') : '' };
+    const cls = s.classification;
+    const clsName = cls ? (cls.class_name || CLASS_NAMES[cls.class_id] || 'Unknown') : 'N/A';
+    const clsConf = cls ? (cls.confidence * 100).toFixed(1) + '%' : '—';
+    grid.innerHTML += `
+      <div class="model-card">
+        <div class="model-card-header">
+          <div class="model-avatar">${pl.name}</div>
+          <div>
+            <div class="model-name">${pl.name}</div>
+            <div class="model-regions">${pl.regions}</div>
+          </div>
+        </div>
+        <div class="model-stat-row"><span>Detections</span><span>${s.detections_found}</span></div>
+        <div class="model-stat-row"><span>Classification</span><span>${clsName}</span></div>
+        <div class="model-stat-row"><span>Conf</span><span>${clsConf}</span></div>
+        <div class="model-stat-row"><span>Seg Masks</span><span>${s.seg_masks_found}</span></div>
+      </div>`;
+  });
+}
+
+function showError(msg) {
+  errorBanner.textContent = msg;
+  errorBanner.classList.add('visible');
+}
+function hideError() {
+  errorBanner.classList.remove('visible');
+}
+</script>
+</body>
+</html>
